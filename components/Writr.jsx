@@ -27,15 +27,19 @@ export default function Writr() {
   const [error, setError]           = useState(null);
   const [copiedIdx, setCopiedIdx]   = useState(null);
   const [selectedP, setSelectedP]   = useState(0);
+  const [chatHistory, setChatHistory] = useState([]);
+  const [chatInput, setChatInput]   = useState("");
+  const [chatLoading, setChatLoading] = useState(false);
   const intervalRef                 = useRef(null);
+  const chatEndRef                  = useRef(null);
 
   const cfg = MODE_CONFIG[mode];
 
-  const switchMode = (m) => { setMode(m); setInput(""); setResult(null); setError(null); setSelectedP(0); };
+  const switchMode = (m) => { setMode(m); setInput(""); setResult(null); setError(null); setSelectedP(0); setChatHistory([]); setChatInput(""); };
 
   const run = async () => {
     if (!input.trim()) return;
-    setLoading(true); setResult(null); setError(null); setSelectedP(0);
+    setLoading(true); setResult(null); setError(null); setSelectedP(0); setChatHistory([]);
     let i = 0;
     const msgs = LOADING_MSGS[mode];
     setLoadingMsg(msgs[0]);
@@ -54,6 +58,62 @@ export default function Writr() {
     } finally {
       clearInterval(intervalRef.current);
       setLoading(false);
+    }
+  };
+
+  const getResultText = () => {
+    if (!result) return "";
+    if (mode === "corriger") return result.corrected;
+    if (mode === "humanizer") return result.final;
+    if (mode === "generer") return result.proposals?.[selectedP]?.text || "";
+    return "";
+  };
+
+  const refine = async () => {
+    if (!chatInput.trim() || !result) return;
+    setChatLoading(true); setError(null);
+
+    const currentText = chatHistory.length > 0
+      ? chatHistory[chatHistory.length - 1].text
+      : getResultText();
+
+    const newHistory = [
+      ...chatHistory,
+      { role: "user", content: chatInput, text: null },
+    ];
+    setChatHistory(newHistory);
+    setChatInput("");
+
+    const apiMessages = [
+      { role: "user", content: `Voici le texte original sur lequel on travaille :\n\n${currentText}` },
+      { role: "assistant", content: JSON.stringify({ text: currentText, notes: "Texte de départ" }) },
+    ];
+    for (const msg of newHistory) {
+      if (msg.role === "user") {
+        apiMessages.push({ role: "user", content: msg.content });
+      } else if (msg.role === "assistant" && msg.text) {
+        apiMessages.push({ role: "assistant", content: JSON.stringify({ text: msg.text, notes: msg.notes || "" }) });
+      }
+    }
+
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode, messages: apiMessages }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setChatHistory((prev) => [
+        ...prev,
+        { role: "assistant", content: data.notes || "Texte modifié", text: data.text, notes: data.notes },
+      ]);
+      setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+    } catch {
+      setError("Erreur lors du raffinement. Réessaie.");
+      setChatHistory((prev) => prev.filter((m) => m.role !== "user" || m.content !== newHistory[newHistory.length - 1].content || prev.indexOf(m) !== prev.length - 1));
+    } finally {
+      setChatLoading(false);
     }
   };
 
@@ -124,7 +184,7 @@ export default function Writr() {
             </span>
             <div style={{ display: "flex", gap: "8px" }}>
               {input && (
-                <button onClick={() => { setInput(""); setResult(null); setError(null); }} style={{
+                <button onClick={() => { setInput(""); setResult(null); setError(null); setChatHistory([]); }} style={{
                   padding: "8px 16px", background: "#fff", border: "1.5px solid #e4e4e4",
                   borderRadius: "6px", color: "#aaa", fontSize: "11px", letterSpacing: "0.08em",
                   textTransform: "uppercase", fontFamily: "monospace", cursor: "pointer",
@@ -206,6 +266,11 @@ export default function Writr() {
                 ))}
               </div>
             )}
+
+            <ChatThread history={chatHistory} chatInput={chatInput} setChatInput={setChatInput}
+              onSend={refine} loading={chatLoading} accent={cfg.accent} accentLight={cfg.accentLight}
+              accentMid={cfg.accentMid} accentText={cfg.accentText} chatEndRef={chatEndRef}
+              onCopy={copy} copiedIdx={copiedIdx} setCopiedIdx={setCopiedIdx} wc={wc} />
           </div>
         )}
 
@@ -249,6 +314,11 @@ export default function Writr() {
                 ))}
               </div>
             )}
+
+            <ChatThread history={chatHistory} chatInput={chatInput} setChatInput={setChatInput}
+              onSend={refine} loading={chatLoading} accent={cfg.accent} accentLight={cfg.accentLight}
+              accentMid={cfg.accentMid} accentText={cfg.accentText} chatEndRef={chatEndRef}
+              onCopy={copy} copiedIdx={copiedIdx} setCopiedIdx={setCopiedIdx} wc={wc} />
           </div>
         )}
 
@@ -299,6 +369,11 @@ export default function Writr() {
                 ))}
               </div>
             </div>
+
+            <ChatThread history={chatHistory} chatInput={chatInput} setChatInput={setChatInput}
+              onSend={refine} loading={chatLoading} accent={cfg.accent} accentLight={cfg.accentLight}
+              accentMid={cfg.accentMid} accentText={cfg.accentText} chatEndRef={chatEndRef}
+              onCopy={copy} copiedIdx={copiedIdx} setCopiedIdx={setCopiedIdx} wc={wc} />
           </div>
         )}
       </main>
@@ -322,6 +397,91 @@ function SectionLabel({ children, color = "#bbb" }) {
 function Pill({ children, color, bg, border }) {
   return <div style={{ padding: "5px 14px", background: bg, border: `1.5px solid ${border}`,
     borderRadius: "20px", fontSize: "11px", fontFamily: "monospace", color }}>{children}</div>;
+}
+
+function ChatThread({ history, chatInput, setChatInput, onSend, loading, accent, accentLight, accentMid, accentText, chatEndRef, onCopy, copiedIdx, setCopiedIdx, wc }) {
+  const lastAssistant = [...history].reverse().find((m) => m.role === "assistant");
+  return (
+    <div style={{ marginTop: "28px", borderTop: "1.5px solid #efefef", paddingTop: "20px" }}>
+      <SectionLabel color={accentText}>Affiner le résultat</SectionLabel>
+
+      {history.length > 0 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginBottom: "16px" }}>
+          {history.map((msg, i) => (
+            <div key={i} style={{
+              alignSelf: msg.role === "user" ? "flex-end" : "flex-start",
+              maxWidth: "85%",
+              animation: "fadeUp 0.2s ease",
+            }}>
+              {msg.role === "user" ? (
+                <div style={{
+                  padding: "10px 16px", background: "#f4f4f4", border: "1.5px solid #e8e8e8",
+                  borderRadius: "12px 12px 2px 12px", fontSize: "13px", color: "#555",
+                  fontFamily: "monospace", lineHeight: "1.5",
+                }}>{msg.content}</div>
+              ) : (
+                <div>
+                  {msg.notes && (
+                    <div style={{ fontSize: "11px", color: "#aaa", fontFamily: "monospace",
+                      fontStyle: "italic", marginBottom: "6px", paddingLeft: "4px" }}>{msg.notes}</div>
+                  )}
+                  <div style={{
+                    padding: "16px", background: accentLight, border: `1.5px solid ${accentMid}`,
+                    borderRadius: "12px 12px 12px 2px", fontSize: "14px", color: "#1a1a1a",
+                    lineHeight: "1.75", whiteSpace: "pre-wrap",
+                  }}>{msg.text}</div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "6px" }}>
+                    <span style={{ fontSize: "11px", color: "#ccc", fontFamily: "monospace" }}>{wc(msg.text)} mots</span>
+                    <button onClick={() => {
+                      navigator.clipboard?.writeText(msg.text);
+                      setCopiedIdx(`chat-${i}`);
+                      setTimeout(() => setCopiedIdx(null), 1800);
+                    }} style={{
+                      padding: "4px 10px", background: "#fff",
+                      border: `1.5px solid ${copiedIdx === `chat-${i}` ? accent : "#e4e4e4"}`,
+                      borderRadius: "4px", color: copiedIdx === `chat-${i}` ? accent : "#aaa",
+                      fontSize: "9px", letterSpacing: "0.1em", textTransform: "uppercase",
+                      fontFamily: "monospace", cursor: "pointer", transition: "all 0.2s",
+                    }}>{copiedIdx === `chat-${i}` ? "Copié ✓" : "Copier"}</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+          <div ref={chatEndRef} />
+        </div>
+      )}
+
+      <div style={{ display: "flex", gap: "8px", alignItems: "flex-end" }}>
+        <textarea
+          value={chatInput}
+          onChange={(e) => setChatInput(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter" && e.metaKey) onSend(); }}
+          placeholder="Dis-lui comment modifier le texte…"
+          rows={2}
+          style={{
+            flex: 1, padding: "10px 14px", background: "#fafafa",
+            border: "1.5px solid #e4e4e4", borderRadius: "8px",
+            color: "#222", fontFamily: "'Georgia', serif", fontSize: "14px",
+            lineHeight: "1.6", resize: "none", outline: "none", transition: "border-color 0.2s",
+          }}
+          onFocus={(e) => e.target.style.borderColor = accent}
+          onBlur={(e) => e.target.style.borderColor = "#e4e4e4"}
+        />
+        <button onClick={onSend} disabled={loading || !chatInput.trim()} style={{
+          padding: "10px 20px", background: loading || !chatInput.trim() ? "#f0f0f0" : accent,
+          color: loading || !chatInput.trim() ? "#bbb" : "#fff",
+          border: "none", borderRadius: "8px", fontSize: "11px", letterSpacing: "0.1em",
+          textTransform: "uppercase", fontFamily: "monospace",
+          cursor: loading || !chatInput.trim() ? "not-allowed" : "pointer",
+          fontWeight: "700", transition: "all 0.15s", whiteSpace: "nowrap",
+        }}>{loading ? "Modification…" : "Envoyer →"}</button>
+      </div>
+      <div style={{ fontSize: "10px", color: "#ccc", fontFamily: "monospace", marginTop: "6px" }}>
+        ⌘ + Entrée pour envoyer
+      </div>
+    </div>
+  );
 }
 
 function CopyBar({ onCopy, copied, accent, wc }) {
