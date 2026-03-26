@@ -3,14 +3,18 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const { mode, input } = req.body;
+  const { mode, input, messages: chatMessages } = req.body;
 
   const VALID_MODES = ["corriger", "humanizer", "generer"];
-  if (!input || !mode || !VALID_MODES.includes(mode)) {
-    return res.status(400).json({ error: "Missing or invalid mode/input" });
+  if (!mode || !VALID_MODES.includes(mode)) {
+    return res.status(400).json({ error: "Missing or invalid mode" });
   }
 
-  if (input.length > 10000) {
+  if (!input && !chatMessages?.length) {
+    return res.status(400).json({ error: "Missing input or messages" });
+  }
+
+  if (input && input.length > 10000) {
     return res.status(400).json({ error: "Texte trop long (max 10 000 caractères)" });
   }
 
@@ -67,7 +71,26 @@ Réponds UNIQUEMENT avec un objet JSON valide (pas de markdown, pas de backticks
 - Chaque proposition doit avoir un angle vraiment différent des autres
 - Pas de langue de bois, pas de formules creuses
 - Les textes doivent sonner humains dès le départ`,
+
+    refine: `Tu es un assistant d'écriture expert. L'utilisateur a déjà reçu un résultat (correction, humanisation ou génération de texte) et veut l'affiner. Tu travailles sur la base de la conversation précédente.
+
+Réponds UNIQUEMENT avec un objet JSON valide (pas de markdown, pas de backticks) :
+{
+  "text": "le texte modifié selon la demande de l'utilisateur",
+  "notes": "courte explication de ce que tu as changé, max 120 chars"
+}
+
+- Garde le contexte complet de la conversation
+- Applique précisément les modifications demandées
+- Conserve ce qui fonctionne, change uniquement ce qui est demandé
+- Le texte doit rester naturel et humain
+- Si l'utilisateur demande d'ajouter du contenu, intègre-le naturellement dans le texte existant`,
   };
+
+  const systemPrompt = chatMessages?.length ? PROMPTS.refine : PROMPTS[mode];
+  const apiMessages = chatMessages?.length
+    ? chatMessages.map((m) => ({ role: m.role, content: m.content }))
+    : [{ role: "user", content: input }];
 
   try {
     const response = await fetch("https://api.anthropic.com/v1/messages", {
@@ -80,8 +103,8 @@ Réponds UNIQUEMENT avec un objet JSON valide (pas de markdown, pas de backticks
       body: JSON.stringify({
         model: "claude-sonnet-4-20250514",
         max_tokens: 2048,
-        system: PROMPTS[mode],
-        messages: [{ role: "user", content: input }],
+        system: systemPrompt,
+        messages: apiMessages,
       }),
     });
 
