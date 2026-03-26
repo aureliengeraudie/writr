@@ -8,6 +8,7 @@ export default function App({ Component, pageProps }) {
         <meta name="description" content="Outil d'écriture IA : corrige l'orthographe, humanise les textes IA, génère du contenu avec 3 styles différents." />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✍️</text></svg>" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
       </Head>
       <style jsx global>{`
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
