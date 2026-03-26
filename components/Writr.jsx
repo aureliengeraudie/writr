@@ -4,18 +4,21 @@ const PLACEHOLDERS = {
   corriger:  "Colle ton texte ici — fautes d'orthographe, de grammaire, de ponctuation, tout sera corrigé et amélioré si besoin.",
   humanizer: "Colle ici un texte généré par IA. L'outil va détecter les patterns typiques et le réécrire avec une vraie voix humaine.",
   generer:   "Décris en une phrase ce que tu veux générer.\n\nEx : « email de relance client, ton professionnel mais chaleureux »\nEx : « bio courte pour profil DJ sur Instagram, style direct et cool »\nEx : « description d'une fonctionnalité SaaS pour une landing page »",
+  drague:    "Colle sa bio, décris son profil, ou colle son message pour avoir des réponses.\n\nEx : « Sa bio dit qu'elle adore le surf et les tacos »\nEx : « Elle m'a envoyé : haha t'es marrant toi »\nEx : « Photos de voyage, bio vide, première accroche »",
 };
 
 const LOADING_MSGS = {
   corriger:  ["Lecture du texte…", "Chasse aux fautes…", "Vérification finale…"],
   humanizer: ["Scan des patterns IA…", "Extraction du slop…", "Réinjection de l'âme…"],
   generer:   ["Analyse du contexte…", "Génération des variantes…", "Mise en forme…"],
+  drague:    ["Analyse du profil…", "Recherche de l'angle…", "Craft des messages…"],
 };
 
 const MODE_CONFIG = {
   corriger:  { label: "Corriger",  cta: "Corriger →",  accent: "#2a7a4a", accentLight: "#edf7f1", accentMid: "#c6e8d4", accentText: "#1a5c36" },
   humanizer: { label: "Humanizer", cta: "Humaniser →", accent: "#c05a1a", accentLight: "#fdf3ec", accentMid: "#f5d4b8", accentText: "#9a3e0e" },
   generer:   { label: "Générer",   cta: "Générer →",   accent: "#3a5ab0", accentLight: "#eef1fb", accentMid: "#c4ccf0", accentText: "#2a3e8a" },
+  drague:    { label: "Drague",    cta: "Générer →",   accent: "#b03a6e", accentLight: "#fdf0f5", accentMid: "#f0c0d8", accentText: "#8a2a55" },
 };
 
 export default function Writr() {
@@ -65,7 +68,7 @@ export default function Writr() {
     if (!result) return "";
     if (mode === "corriger") return result.corrected;
     if (mode === "humanizer") return result.final;
-    if (mode === "generer") return result.proposals?.[selectedP]?.text || "";
+    if (mode === "generer" || mode === "drague") return result.proposals?.[selectedP]?.text || "";
     return "";
   };
 
@@ -159,6 +162,7 @@ export default function Writr() {
           {mode === "corriger"  && "— corrige l'orthographe, la grammaire et améliore la fluidité"}
           {mode === "humanizer" && "— détecte les patterns IA et réécrit avec une vraie voix"}
           {mode === "generer"   && "— décris un contexte, reçois 3 propositions avec des styles différents"}
+          {mode === "drague"    && "— colle sa bio ou son message, reçois des réponses qui font mouche"}
         </div>
 
         {/* TEXTAREA */}
@@ -169,7 +173,7 @@ export default function Writr() {
             onKeyDown={(e) => { if (e.key === "Enter" && e.metaKey) run(); }}
             placeholder={PLACEHOLDERS[mode]}
             style={{
-              width: "100%", minHeight: mode === "generer" ? "110px" : "150px",
+              width: "100%", minHeight: (mode === "generer" || mode === "drague") ? "110px" : "150px",
               background: "#fafafa", border: "1.5px solid #e4e4e4", borderRadius: "8px",
               color: "#222", fontFamily: "'Georgia', serif", fontSize: "15px",
               lineHeight: "1.75", padding: "16px", resize: "vertical",
@@ -369,6 +373,91 @@ export default function Writr() {
                 ))}
               </div>
             </div>
+
+            <ChatThread history={chatHistory} chatInput={chatInput} setChatInput={setChatInput}
+              onSend={refine} loading={chatLoading} accent={cfg.accent} accentLight={cfg.accentLight}
+              accentMid={cfg.accentMid} accentText={cfg.accentText} chatEndRef={chatEndRef}
+              onCopy={copy} copiedIdx={copiedIdx} setCopiedIdx={setCopiedIdx} wc={wc} />
+          </div>
+        )}
+
+        {/* ══ DRAGUE ══ */}
+        {result && mode === "drague" && (
+          <div style={{ animation: "fadeUp 0.3s ease" }}>
+            {result.analysis && (
+              <div style={{ padding: "12px 16px", background: cfg.accentLight, border: `1.5px solid ${cfg.accentMid}`,
+                borderRadius: "8px", fontSize: "13px", color: cfg.accentText, fontFamily: "monospace",
+                marginBottom: "20px", lineHeight: "1.5" }}>
+                {result.analysis}
+              </div>
+            )}
+
+            <SectionLabel color={cfg.accentText}>3 approches</SectionLabel>
+            <div style={{ display: "flex", gap: "6px", marginBottom: "16px", flexWrap: "wrap" }}>
+              {result.proposals?.map((p, i) => (
+                <button key={i} onClick={() => setSelectedP(i)} style={{
+                  padding: "7px 18px",
+                  background: selectedP === i ? cfg.accent : "#fff",
+                  color: selectedP === i ? "#fff" : "#888",
+                  border: `1.5px solid ${selectedP === i ? cfg.accent : "#e4e4e4"}`,
+                  borderRadius: "6px", fontSize: "11px", letterSpacing: "0.1em",
+                  textTransform: "uppercase", fontFamily: "monospace",
+                  cursor: "pointer", fontWeight: selectedP === i ? "700" : "400", transition: "all 0.15s",
+                }}>{p.label}</button>
+              ))}
+            </div>
+
+            {result.proposals?.[selectedP] && (
+              <div style={{ marginBottom: "20px" }}>
+                <div style={{ padding: "22px", background: cfg.accentLight, border: `1.5px solid ${cfg.accentMid}`,
+                  borderRadius: "8px", fontSize: "16px", lineHeight: "1.85", color: "#1a1a1a", whiteSpace: "pre-wrap" }}>
+                  {result.proposals[selectedP].text}
+                </div>
+                {result.proposals[selectedP].why && (
+                  <div style={{ fontSize: "11px", color: "#aaa", fontFamily: "monospace",
+                    fontStyle: "italic", marginTop: "8px", paddingLeft: "4px" }}>
+                    {result.proposals[selectedP].why}
+                  </div>
+                )}
+                <CopyBar onCopy={() => copy(result.proposals[selectedP].text, selectedP)}
+                  copied={copiedIdx === selectedP} accent={cfg.accent} wc={wc(result.proposals[selectedP].text)} />
+              </div>
+            )}
+
+            <div style={{ borderTop: "1.5px solid #efefef", paddingTop: "20px" }}>
+              <SectionLabel>Toutes les approches</SectionLabel>
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                {result.proposals?.map((p, i) => (
+                  <div key={i} onClick={() => setSelectedP(i)} style={{
+                    padding: "14px 16px",
+                    background: selectedP === i ? cfg.accentLight : "#fafafa",
+                    border: `1.5px solid ${selectedP === i ? cfg.accentMid : "#ebebeb"}`,
+                    borderRadius: "8px", cursor: "pointer", transition: "all 0.15s",
+                  }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "5px" }}>
+                      <div style={{ fontSize: "10px", letterSpacing: "0.15em", textTransform: "uppercase",
+                        fontFamily: "monospace", color: selectedP === i ? cfg.accentText : "#bbb" }}>{p.label}</div>
+                      {p.why && <div style={{ fontSize: "10px", color: "#bbb", fontFamily: "monospace",
+                        fontStyle: "italic" }}>{p.why}</div>}
+                    </div>
+                    <div style={{ fontSize: "14px", color: selectedP === i ? "#1a1a1a" : "#888", lineHeight: "1.6" }}>{p.text}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {result.tips?.length > 0 && (
+              <div style={{ marginTop: "22px" }}>
+                <SectionLabel color={cfg.accentText}>Tips pour la suite</SectionLabel>
+                {result.tips.map((tip, i) => (
+                  <div key={i} style={{ display: "flex", gap: "10px", padding: "7px 10px",
+                    background: i % 2 === 0 ? "#fafafa" : "transparent",
+                    borderRadius: "4px", fontSize: "13px", color: "#666" }}>
+                    <span style={{ color: cfg.accentMid }}>*</span>{tip}
+                  </div>
+                ))}
+              </div>
+            )}
 
             <ChatThread history={chatHistory} chatInput={chatInput} setChatInput={setChatInput}
               onSend={refine} loading={chatLoading} accent={cfg.accent} accentLight={cfg.accentLight}
