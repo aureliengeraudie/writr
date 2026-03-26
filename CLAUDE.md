@@ -2,7 +2,7 @@
 
 ## Description
 
-Outil web d'écriture IA avec 3 modes : Corriger (orthographe/grammaire), Humanizer (dé-IA-ifier un texte), Générer (3 propositions variées). Propulsé par Claude Sonnet 4 via l'API Anthropic.
+Outil web d'écriture IA avec 4 modes : Corriger (orthographe/grammaire), Humanizer (dé-IA-ifier un texte), Générer (3 propositions variées), Drague (expert séduction apps de rencontre). Chaque mode inclut un chat conversationnel pour affiner les résultats. Propulsé par Claude Sonnet 4 via l'API Anthropic.
 
 ## Stack
 
@@ -17,16 +17,17 @@ Outil web d'écriture IA avec 3 modes : Corriger (orthographe/grammaire), Humani
 pages/index.js          → Point d'entrée, render <Writr />
 pages/_app.js           → Head (meta, title, favicon) + global CSS reset
 pages/api/chat.js       → API route proxy vers Anthropic (clé jamais côté client)
-components/Writr.jsx    → Composant UI unique (3 modes, résultats, copy)
+components/Writr.jsx    → Composant UI unique (4 modes, résultats, chat, copy)
 docs/planning/PRD.md    → Product Requirements Document
 ```
 
 ## Conventions
 
-- **Pas de CSS framework** : tout est en inline styles dans les composants React
-- **Single component** : toute l'UI est dans `Writr.jsx` avec des sous-composants locaux (`SectionLabel`, `Pill`, `CopyBar`)
-- **API route unique** : `/api/chat` gère les 3 modes via le champ `mode` du body
-- **Prompts structurés** : chaque mode a son propre system prompt qui demande du JSON strict
+- **Pas de CSS framework** : inline styles + CSS classes pour le responsive (media queries `@media max-width: 640px`)
+- **Single component** : toute l'UI est dans `Writr.jsx` avec des sous-composants locaux (`SectionLabel`, `Pill`, `CopyBar`, `ChatThread`)
+- **API route unique** : `/api/chat` gère les 4 modes via le champ `mode` du body + supporte `messages` pour le chat de raffinement
+- **Prompts structurés** : chaque mode a son propre system prompt qui demande du JSON strict + un prompt `refine` pour le chat conversationnel
+- **Responsive** : mobile-first, testé sur iPhone (header stack, grids en colonne, paddings adaptés)
 
 ## Variables d'environnement
 
@@ -46,5 +47,6 @@ npm start       # Serveur production
 
 - Ne jamais exposer `ANTHROPIC_API_KEY` côté client
 - Input limité à 10 000 caractères côté API
-- Les 3 modes valides sont : `corriger`, `humanizer`, `generer`
+- Les 4 modes valides sont : `corriger`, `humanizer`, `generer`, `drague`
 - Les réponses Claude sont parsées en JSON (avec nettoyage des backticks markdown)
+- Le chat de raffinement envoie l'historique complet via le champ `messages` du body (au lieu de `input`)
