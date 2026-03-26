@@ -132,31 +132,30 @@ export default function Writr() {
     <div style={{ minHeight: "100vh", background: "#ffffff", color: "#1a1a1a", fontFamily: "'Georgia', serif" }}>
 
       {/* HEADER */}
-      <header style={{ padding: "18px 36px", borderBottom: "1.5px solid #e8e8e8",
-        display: "flex", alignItems: "center", gap: "16px", background: "#fff" }}>
+      <header className="writr-header">
         <div>
           <div style={{ fontSize: "9px", letterSpacing: "0.28em", color: "#bbb",
             fontFamily: "monospace", textTransform: "uppercase" }}>Outil d'écriture</div>
           <div style={{ fontSize: "20px", letterSpacing: "0.08em", color: "#111",
             fontFamily: "monospace", fontWeight: "800" }}>WRITR</div>
         </div>
-        <div style={{ marginLeft: "auto", display: "flex", gap: "2px",
-          background: "#f4f4f4", border: "1.5px solid #e8e8e8", borderRadius: "8px", padding: "3px" }}>
+        <div className="writr-tabs">
           {Object.entries(MODE_CONFIG).map(([id, c]) => (
             <button key={id} onClick={() => switchMode(id)} style={{
-              padding: "7px 18px",
+              padding: "7px 14px",
               background: mode === id ? c.accent : "transparent",
               color: mode === id ? "#fff" : "#888",
               border: "none", borderRadius: "6px",
-              fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase",
+              fontSize: "11px", letterSpacing: "0.08em", textTransform: "uppercase",
               fontFamily: "monospace", cursor: "pointer",
               fontWeight: mode === id ? "700" : "400", transition: "all 0.15s",
+              whiteSpace: "nowrap", flex: "0 0 auto",
             }}>{c.label}</button>
           ))}
         </div>
       </header>
 
-      <main style={{ padding: "32px 36px", maxWidth: "960px" }}>
+      <main className="writr-main">
         <div style={{ fontSize: "12px", color: "#aaa", fontStyle: "italic",
           marginBottom: "22px", fontFamily: "monospace" }}>
           {mode === "corriger"  && "— corrige l'orthographe, la grammaire et améliore la fluidité"}
@@ -242,9 +241,7 @@ export default function Writr() {
                 <SectionLabel>Corrections</SectionLabel>
                 <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                   {result.corrections.map((c, i) => (
-                    <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 24px 1fr",
-                      alignItems: "start", gap: "8px", padding: "10px 14px",
-                      background: "#fafafa", border: "1.5px solid #efefef", borderRadius: "6px" }}>
+                    <div key={i} className="writr-correction-item">
                       <span style={{ fontSize: "13px", color: "#c03030",
                         textDecoration: "line-through", fontFamily: "monospace", wordBreak: "break-word" }}>{c.original}</span>
                       <span style={{ color: "#ccc", fontSize: "12px", textAlign: "center", paddingTop: "2px" }}>→</span>
@@ -293,7 +290,7 @@ export default function Writr() {
                 </div>
               </div>
             )}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "12px" }}>
+            <div className="writr-compare">
               <div>
                 <SectionLabel color="#bbb">Avant</SectionLabel>
                 <div style={{ padding: "16px", background: "#fafafa", border: "1.5px solid #ebebeb",
@@ -473,6 +470,79 @@ export default function Writr() {
         ::-webkit-scrollbar { width: 5px; }
         ::-webkit-scrollbar-track { background: #f8f8f8; }
         ::-webkit-scrollbar-thumb { background: #ddd; border-radius: 3px; }
+
+        .writr-header {
+          padding: 18px 36px;
+          border-bottom: 1.5px solid #e8e8e8;
+          display: flex;
+          align-items: center;
+          gap: 16px;
+          background: #fff;
+        }
+        .writr-tabs {
+          margin-left: auto;
+          display: flex;
+          gap: 2px;
+          background: #f4f4f4;
+          border: 1.5px solid #e8e8e8;
+          border-radius: 8px;
+          padding: 3px;
+          overflow-x: auto;
+          -webkit-overflow-scrolling: touch;
+        }
+        .writr-tabs::-webkit-scrollbar { display: none; }
+        .writr-main {
+          padding: 32px 36px;
+          max-width: 960px;
+        }
+        .writr-compare {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 16px;
+          margin-bottom: 12px;
+        }
+        .writr-correction-item {
+          display: grid;
+          grid-template-columns: 1fr 24px 1fr;
+          align-items: start;
+          gap: 8px;
+          padding: 10px 14px;
+          background: #fafafa;
+          border: 1.5px solid #efefef;
+          border-radius: 6px;
+        }
+
+        @media (max-width: 640px) {
+          .writr-header {
+            padding: 14px 16px;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 12px;
+          }
+          .writr-tabs {
+            margin-left: 0;
+            width: 100%;
+          }
+          .writr-tabs button {
+            flex: 1 1 0 !important;
+            text-align: center;
+            padding: 8px 6px !important;
+            font-size: 10px !important;
+          }
+          .writr-main {
+            padding: 20px 16px;
+          }
+          .writr-compare {
+            grid-template-columns: 1fr;
+          }
+          .writr-correction-item {
+            grid-template-columns: 1fr;
+            gap: 4px;
+          }
+          .writr-correction-item > span:nth-child(2) {
+            display: none;
+          }
+        }
       `}</style>
     </div>
   );
